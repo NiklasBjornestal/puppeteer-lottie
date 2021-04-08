@@ -12,6 +12,7 @@ const { spawn } = require('child_process')
 const { sprintf } = require('sprintf-js')
 
 const { cssifyObject } = require('css-in-js-utils')
+const { exit } = require('process')
 
 const lottieScript = fs.readFileSync(require.resolve('lottie-web/build/player/lottie.min'), 'utf8')
 
@@ -118,8 +119,9 @@ module.exports = async (opts) => {
   const isMp4 = (ext === 'mp4')
   const isPng = (ext === 'png')
   const isJpg = (ext === 'jpg' || ext === 'jpeg')
+  const isSvg = (ext === 'svg')
 
-  if (!(isApng || isGif || isMp4 || isPng || isJpg)) {
+  if (!(isApng || isGif || isMp4 || isPng || isJpg || isSvg)) {
     throw new Error(`Unsupported output format "${output}"`)
   }
 
@@ -293,7 +295,7 @@ ${inject.body || ''}
 
       if (isApng) {
         ffmpegArgs.push(
-          '-f', 'image2pipe', '-c:v', 'png', '-r', `${fps}`, '-i', '-',
+          '-f', 'image2pipe', '-r', `${fps}`, '-i', '-',
           '-plays', '0'
         )
       }
@@ -362,6 +364,13 @@ ${inject.body || ''}
       ? sprintf(tempOutput, frame + 1)
       : tempOutput
 
+    if (isSvg) {
+      await page.evaluate((frame) => animation.goToAndStop(frame, true), frame)
+      const aHandle = await page.evaluateHandle(() => document)
+      const resultHandle = await page.evaluateHandle(document => document.querySelector('#root').innerHTML, aHandle);
+      fs.writeFileSync(frameOutputPath, await resultHandle.jsonValue()  )
+      continue;
+    }
     // eslint-disable-next-line no-undef
     await page.evaluate((frame) => animation.goToAndStop(frame, true), frame)
     const screenshot = await rootHandle.screenshot({
